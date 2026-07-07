@@ -2,7 +2,7 @@
 
 FROM ghcr.io/hostinger/hvps-hermes-agent:latest AS hermes
 # hermes 설치 위치: /opt/hermes (venv: /opt/hermes/.venv/bin/hermes)
-# ttyd 위치: /usr/bin/ttyd
+# ttyd: 업스트림 이미지에서 제거됨(2026-06-09~) → stage-1에서 정적 바이너리 직접 설치
 
 FROM ghcr.io/hostinger/hvps-paperclip:latest
 
@@ -18,8 +18,12 @@ RUN apt-get update \
 # NOTE: Full Python venv required — minimum 750MB without optimization. Tracked for v1.1 slim-down.
 # Use --chown to set ownership at copy time (recursive chown on millions of venv files would OOM).
 COPY --from=hermes --chown=node:node /opt/hermes /opt/hermes
-# ttyd 바이너리 복사
-COPY --from=hermes /usr/bin/ttyd /usr/local/bin/ttyd
+# ttyd: 업스트림 hermes-agent 이미지에서 제거됨(2026-06-09~, 이전엔 /usr/bin/ttyd COPY).
+# tsl0922/ttyd 릴리스의 정적 amd64 바이너리를 버전 고정하여 직접 설치 (curl은 베이스에 존재).
+ARG TTYD_VERSION=1.7.7
+RUN curl -fsSL -o /usr/local/bin/ttyd \
+      "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.x86_64" \
+ && chmod +x /usr/local/bin/ttyd
 
 # hermes CLI를 PATH에 노출
 ENV PATH=/opt/hermes/.venv/bin:$PATH

@@ -44,12 +44,16 @@ RUN mkdir -p /paperclip /home/node/.hermes /home/node/.codex \
 # when agent's adapterConfig.model is empty, instead of falling back to
 # anthropic/claude-sonnet-4. Mirrors upstream PR #123 (OPEN):
 #   https://github.com/NousResearch/hermes-paperclip-adapter/pull/123
-# Once upstream merges and a new base image picks it up, this sed
-# becomes a no-op (idempotent).
-RUN ADAPTER_JS=/usr/local/lib/node_modules/paperclipai/node_modules/hermes-paperclip-adapter/dist/server/execute.js \
- && sed -i 's#cfgString(config\.model) || DEFAULT_MODEL#cfgString(config.model)#g' "$ADAPTER_JS" \
- && REMAIN=$(grep -c 'cfgString(config.model) || DEFAULT_MODEL' "$ADAPTER_JS" 2>/dev/null || echo 0) \
- && echo "remaining DEFAULT_MODEL fallbacks: $REMAIN"
+# 패키지가 스코프 네임스페이스(@paperclipai/)로 이동됨(2026-07~).
+# 파일이 없으면(업스트림 병합/재이동) 하드 실패 대신 스킵 — 데일리 :latest 빌드 안정성 확보.
+RUN ADAPTER_JS=/usr/local/lib/node_modules/paperclipai/node_modules/@paperclipai/hermes-paperclip-adapter/dist/server/execute.js \
+ && if [ -f "$ADAPTER_JS" ]; then \
+      sed -i 's#cfgString(config\.model) || DEFAULT_MODEL#cfgString(config.model)#g' "$ADAPTER_JS" \
+      && REMAIN=$(grep -c 'cfgString(config.model) || DEFAULT_MODEL' "$ADAPTER_JS" 2>/dev/null || echo 0) \
+      && echo "patched adapter; remaining DEFAULT_MODEL fallbacks: $REMAIN"; \
+    else \
+      echo "adapter execute.js not found at $ADAPTER_JS — skipping patch (upstream may have moved/merged it)"; \
+    fi
 
 ENV HOME=/home/node
 ENV HERMES_HOME=/home/node/.hermes
